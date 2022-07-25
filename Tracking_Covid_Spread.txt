@@ -1,0 +1,336 @@
+breed[
+persons person ;students
+]
+
+
+
+; dining hall has highest transmission rate
+; library and other areas are 50/50
+; class has least
+; random chance for parties
+; room capacities?
+
+;;; current limitations;;;
+;does not take into account somesfkasdjflksdjf think ab out it later
+
+
+
+;variables that show patches purpose
+patches-own [
+  dining?
+  residence?
+  class?
+  quarantine?
+]
+
+
+
+persons-own[
+  infected? ;shows if person is infected
+  close-contact? ;shows if student recently came into contact with someone with covid
+  current-building? ;shows current building of student
+  infection-counter ; counts down how much covid someone has
+  immunity ; this is going to stop someone from getting covid
+  close-contact-counter ;; gets rid of close-contact following
+  known? ; if person knows they are infected, they go to quarantine
+  dorm ; dorm room
+  class1 ; one classroom
+  class2 ; two classrooms
+  dining ; choice of dining hall
+  current-location ; keeps track of where students are
+  quarantined?  ;students are kept in isolation
+]
+
+
+;observer context
+;creates world and creates students at the college
+to setup
+  import-pcolors "midd-map7.png" ;imports map
+  classify ; buildings are colored and labeled
+  create-persons population [
+    ;students are randomly placed in setup
+    setxy random-pxcor random-pycor
+
+    ;sets 2.5% of students to have covid, this was a creative liberty taken based off of anecdotal evidence
+    set infected? (who < population * 0.025) ;; takes number of people times possiblity of having covid
+
+    set close-contact? false ;noone is a close-contact at first
+
+
+    set-colors
+    set heading 180
+    set infection-counter 0
+    set immunity 0
+    set known? false
+    set quarantined? false
+
+    ;;declares schedules
+    set dining one-of patches with [dining? = true]
+    set dorm one-of patches with [residence? = true]
+    set class1 one-of patches with [ class? = true ]
+    set class2 one-of patches with [ class? = true ]
+    set size 3
+  ]
+  ask persons with [infected? = true] [set infection-counter 336 ]  ; infection will last 24 hours with each tick being 1 hour
+
+  reset-ticks
+
+end
+
+;observer-context function
+;color variation within buildings is fixed and patches are labeled as specific locations
+to classify
+
+  ;color fixing
+  ask patches with [pcolor = 24] [ set pcolor 24.1]
+  ask patches with [pcolor = 24.2] [set pcolor 24.1]
+  ask patches with [pcolor = 106.1] [ set pcolor 106 ]
+  ask patches with [pcolor = 44.7] [ set pcolor 44.6]
+
+  ;color fix and sets patch to class
+  ask patches with [pcolor = 24.1] [ set pcolor 27 set class? true ]
+
+  ;patches are set to have their purpose
+  ask patches with [pcolor = 106] [ set residence? true]
+  ask patches with [pcolor = 44.6] [set dining? true]
+  ask patches with [pcolor = 114.9][set quarantine? true]
+
+
+
+end
+
+
+
+;person-context function
+;students change color depending on current state
+to set-colors
+  ;; if infected
+  ifelse infected? [
+    set shape "person3"
+    set color 135
+  ][
+    ;close-contacts
+    ifelse close-contact? [
+      set shape "person2"
+      set color 86
+    ][
+      ;healthy
+      set shape "person2"
+      set color 63
+    ]
+  ]
+end
+
+;observer context function that executes every tick
+; students are tested, quarantined, move, spread covid, and develop symptoms within a single tick
+to go
+
+  test  ; tests students for covid
+  quarantine ; quarantines students with covid
+  move
+  ;wait .7
+  covid-spread ; lets spread covid
+ ; wait .7
+  develop-symptoms
+ ; wait .7
+
+  tick
+
+end
+
+
+
+
+;observer context function
+; depending on the time of day, persons move in different areas
+to move
+
+  ; day ends with students staying in dorms until 8
+  if time-of-day = 0 [
+    ask persons with [quarantined? = false]  [move-to dorm set current-location "dorm"]
+    show "Students are now sleeping"
+  ]
+
+  ; some students leave to go to eat at 8
+  if time-of-day = 8 [
+    show "The day starts"
+    ask up-to-n-of (pop-thirds) persons with [quarantined? = false]  [move-to dining set current-location "dine"]
+  ]
+
+  ;other students go to eat at 9
+  if time-of-day = 9 [
+    ask up-to-n-of (pop-thirds) persons with [current-location = "dorm"] [move-to dining set current-location "dine"]  ; moves rest of persons to dining hall
+  ]
+
+  ;students then move to a random class at 11
+  if time-of-day = 11[
+    ask persons with [quarantined? = false] [move-to random-class]
+
+  ]
+
+  ;students randomly go to another class at 12
+  if time-of-day = 12 [ ask persons with [quarantined? = false] [ move-to random-class set current-location "class"]]
+
+  ;some students that are in class go to eat at 1
+  if time-of-day = 13 [ask up-to-n-of (pop-thirds * 2) persons with [current-location = "class" ] [ move-to dining set current-location "dine" ] ]
+
+  ;students who are dining go to class and students who are in class go back to their dorms
+  if time-of-day = 14 [
+    ask persons with [current-location = "class"] [move-to dorm set current-location "dorm"]
+    ask persons with [ current-location = "dine" ][ move-to random-class set current-location "class"]]
+
+  ;students continue random movement between classrooms, dorms, and dining, from 3pm until midnight
+  if time-of-day >= 15 [ask persons with [quarantined? = false] [ move-to random-move]]
+
+
+end
+
+
+;; going to set covid counter manually
+; person-context
+;students can recover from their current illness after 336 hours of covid
+to recover
+  if infected? [
+    set infection-counter infection-counter - 1 ;decreases by a single hour
+    ;checks to make sure 336 hours have gone by
+    if infection-counter = 0 [
+      set infected? false
+      set-colors        ;updates visual of person to show they are healthy
+      set immunity 1460 ; roughly 2 months in hours
+      set known? false  ; students are then released from quarantine
+      set quarantined? false
+    ]
+  ]
+
+end
+
+;observer context function
+;persons lose immunity, recover, and spread infection within this function
+to covid-spread
+  ask persons [
+    if immunity > 0 [ set immunity immunity - 1 ] ; decreases immunity of a person by 1 hour
+
+    recover ; if student is infected, gives a chance for recovery
+    if infected? [
+
+      ;only infect students who are not infected and are not immune
+      ask other persons in-radius 2 with [infected? = false and immunity = 0][
+        set close-contact? true
+        set close-contact-counter 336 ; 5 day close-contacts
+
+        ]
+       set-colors ;resets visual of a student
+      ]
+    ]
+
+end
+
+
+; observer context function
+; close-contacts can develop covid
+to develop-symptoms
+
+  ;close-contacts have a chance of developing covid
+  ask persons with [close-contact? = true] [
+    let infection-rate 2.5
+    ;higher chance at dining halls
+    if current-location = "dine" [
+      set infection-rate 30]
+    ;checks if it has been at least 2 days
+    if close-contact-counter <= 168[
+      if random-float 100 <= infection-rate[
+        set infected? true
+        set infection-counter 336 ;two weeks in hours
+        set close-contact? false  ;no longer a close contact
+        set close-contact-counter 1 ; gets decreased to zero once leaving the if statement
+        set known? false
+
+      ]
+            set-colors ; updates color
+    ]
+    set close-contact-counter close-contact-counter - 1
+    if close-contact-counter = 0 [
+      set close-contact? false
+       set-colors ; updates color
+    ]
+
+  ]
+end
+
+;observer-context function
+;tests depending on how frequent user decides, also only tests a certain percentage of population
+to test
+  if testing-time = 0 [
+    ask n-of ((count persons) * (testing-percentage / 100)) persons [  ;this only tests percentage specified by user
+      if infected? [
+      set known? true
+      ]
+    ]
+  ]
+end
+
+;observer-context function
+;persons are quarantined once they find out they are infected
+to quarantine
+  if isolation-on [
+    ask persons with [known? = true and quarantined? = false] [
+      move-to one-of patches with [quarantine? = true] ; to purple building
+      set current-location "quarantine"
+      set quarantined? true]
+  ]
+
+end
+
+;observer context reporter
+;randomly picks third of population
+to-report pop-thirds
+  report population / 3
+end
+
+; observer context reporter
+; shows the time of day in hours
+to-report time-of-day
+  report ticks mod 24
+end
+
+
+;person-context reporter
+;picks random class
+to-report random-class
+  ifelse random-float 1 < .5 [
+    report class1
+  ]
+  [
+    report class2
+  ]
+
+end
+
+
+;person-context function
+;decides a random location to move to
+to-report random-move
+  ; 1 in 4 chance of getting a specific location
+  let prob random 4
+
+  if prob = 0 [
+    report dining
+  ]
+  if prob = 1 [
+    report class1
+  ]
+  if prob = 2 [
+    report class2
+  ]
+  if prob = 3 [
+    report dorm
+  ]
+end
+
+;observer reporter
+;calculates if test should be conducted
+to-report testing-time
+
+  report ticks mod (testing-frequency * 24)
+
+end
