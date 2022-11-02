@@ -1,4 +1,5 @@
-# CrisisCenterSpread
+# TRACKING COVID
+
 
 ## WHAT IS IT?
 
@@ -29,6 +30,6 @@ Some ways to extend the model would include allowing the option for masks to be 
 (models in the NetLogo Models Library and elsewhere which are of related interest)
 
 ## CREDITS AND REFERENCES
-This code was created my Manuel Fors and Sartaj Singh 
+This code was created by Manuel Fors
 Students on Campus offered me insight on how they went about their days. The Middlebury Campus map came from https://www.middlebury.edu/system/files/media/middlebury%20campus%20map%202022.pdf. 
 Ideas of the model were roughly based off of "High-Resolution Agent-Based Modeling of COVID-19 Spreading in a Small Town" by Truzkowska et al. "https://onlinelibrary.wiley.com/doi/10.1002/adts.202000277 such as having specific areas designated definitely with different functions.
